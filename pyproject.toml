@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leetcode-init"
+version = "0.1.0"
+description = "Scaffold a C++20 LeetCode challenge template"
+requires-python = ">=3.9"
+dependencies = ["PyGithub>=2"]
+
+[project.scripts]
+leetcode-init = "leetcode_init.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+leetcode_init = ["templates/**/*", "templates/**/.*"]

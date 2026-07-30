@@ -1,0 +1,17 @@
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.idea/
+.vscode/
+.vs/
+.fleet/
+.junie/
+.claude/
+.cursor/
+.aider*
+*.swp
+.DS_Store
