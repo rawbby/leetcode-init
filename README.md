@@ -7,7 +7,8 @@ fast release), clang-format/clang-tidy targets, pre-push hook, and a lean GitHub
 ## Install
 
 ```sh
-pip install git+https://github.com/<you>/leetcode-init
+python -m pip install --upgrade pip
+python -m pip install --upgrade git+https://github.com/rawbby/leetcode-init@<version>
 ```
 
 ## Use

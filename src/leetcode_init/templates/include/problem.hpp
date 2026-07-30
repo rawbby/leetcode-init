@@ -2,4 +2,8 @@
 
 #include <iostream>
 
-inline void solve() { std::cout << std::cin.rdbuf(); }
+inline void
+solve()
+{
+  std::cout << std::cin.rdbuf();
+}

@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import date
@@ -13,15 +14,13 @@ SNAKE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 def run(*args, cwd=None, capture=False):
     return subprocess.run(
-        args, cwd=cwd, check=True, text=True,
-        capture_output=capture,
-    )
+        args, cwd=cwd, check=True, text=True, capture_output=capture)
 
 
 def git_config(key):
     out = subprocess.run(
-        ["git", "config", "--get", key], capture_output=True, text=True
-    )
+        ["git", "config", "--get", key],
+        capture_output=True, text=True)
     return out.stdout.strip()
 
 
@@ -70,7 +69,23 @@ def init_git(dest, project):
     run("git", "commit", "-q", "-m", f"init: {project}", cwd=dest)
 
 
-def create_github_repo(dest, project, github, private):
+def undo(dest, created_dir, repo):
+    if repo is not None:
+        try:
+            repo.delete()
+        except Exception as e:
+            print(f"warning: undo failed, delete https://github.com/{repo.full_name} manually: {e}", file=sys.stderr)
+    try:
+        if created_dir:
+            shutil.rmtree(dest)
+        elif dest.exists():
+            for child in dest.iterdir():
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
+    except Exception as e:
+        print(f"warning: undo failed, remove {dest} manually: {e}", file=sys.stderr)
+
+
+def create_github_repo(dest, project, github, private, state):
     interactive = github is None
     if interactive:
         github = ask("Create GitHub repository? (y/n)", "y").lower() == "y"
@@ -89,11 +104,12 @@ def create_github_repo(dest, project, github, private):
     gh = Github(auth=Auth.Token(token))
     user = gh.get_user()
     if private is None:
-        private = ask("Private repository? (y/n)", "y").lower() == "y" if interactive else True
-    repo = user.create_repo(project, private=private, description=f"LeetCode: {project}")
+        private = ask("Private repository? (y/n)", "n").lower() == "y" if interactive else False
+    repo = user.create_repo(f"leetcode_{project}", private=private, description=f"LeetCode: {project}")
+    state["repo"] = repo
     push_url = f"https://x-access-token:{token}@github.com/{repo.full_name}.git"
     run("git", "remote", "add", "origin", push_url, cwd=dest)
-    run("git", "push", "-q", "-u", "origin", "main", cwd=dest)
+    run("git", "push", "-q", "--no-verify", "-u", "origin", "main", cwd=dest)
     run("git", "remote", "set-url", "origin", repo.clone_url, cwd=dest)
     print(f"created {repo.html_url}")
 
@@ -114,7 +130,8 @@ def main():
 
     if args.github and not (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")):
         sys.exit("error: --github requires GITHUB_TOKEN or GH_TOKEN")
-    problem = ask_snake("Problem name (snake_case)", "two_sum", args.problem)
+    dir_name = Path(args.directory).name if args.directory else ""
+    problem = ask_snake("Problem name (snake_case)", dir_name if SNAKE.match(dir_name) else "two_sum", args.problem)
     dest = Path(args.directory or problem).resolve()
     if dest.exists() and any(dest.iterdir()):
         sys.exit(f"error: {dest} is not empty")
@@ -128,10 +145,16 @@ def main():
         "author": author,
         "year": str(date.today().year),
     }
-    dest.mkdir(parents=True, exist_ok=True)
-    render_tree(resources.files("leetcode_init") / "templates", dest, subs)
-    init_git(dest, project)
-    create_github_repo(dest, project, args.github, args.private)
+    created_dir = not dest.exists()
+    state = {"repo": None}
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        render_tree(resources.files("leetcode_init") / "templates", dest, subs)
+        init_git(dest, project)
+        create_github_repo(dest, project, args.github, args.private, state)
+    except BaseException:
+        undo(dest, created_dir, state["repo"])
+        raise
     print(f"ready: {dest}")
 
 
